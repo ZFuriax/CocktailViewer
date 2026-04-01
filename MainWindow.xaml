@@ -1,0 +1,552 @@
+﻿<Window x:Class="CocktailViewer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:CocktailViewer"
+        Title="Cocktail Viewer"
+        WindowStartupLocation="CenterScreen"
+        Background="Black"
+        AllowDrop="True"
+        Drop="Window_Drop"
+        SizeChanged="Window_SizeChanged">
+
+    <Window.Resources>
+        <local:FileNameNoExtensionConverter x:Key="FileNameNoExt"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Window.Resources>
+
+    <Grid Background="Black">
+        <Grid.ColumnDefinitions>
+            <!-- Default width stays 220, but now resizable -->
+            <ColumnDefinition Width="220" MinWidth="160" MaxWidth="500"/>
+            <!-- Splitter column -->
+            <ColumnDefinition Width="10"/>
+            <!-- Right side -->
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- LEFT: Folder-preserving thumbnail library -->
+        <Border Grid.Column="0" Background="#111111" BorderBrush="#333333" BorderThickness="0,0,1,0">
+            <DockPanel LastChildFill="True">
+
+				<!-- Bottom-left buttons -->
+				<StackPanel DockPanel.Dock="Bottom"
+							Margin="10">
+					<Button Content="Browse Library"
+							Height="44"
+							Margin="0,0,0,22"
+							Background="#202020"
+							Foreground="#DDFFFFFF"
+							BorderBrush="#333333"
+							BorderThickness="1"
+							Click="BrowseLibrary_Click">
+						<Button.Style>
+							<Style TargetType="Button">
+								<Setter Property="Cursor" Value="Hand"/>
+								<Setter Property="Template">
+									<Setter.Value>
+										<ControlTemplate TargetType="Button">
+											<Border Background="{TemplateBinding Background}"
+													BorderBrush="{TemplateBinding BorderBrush}"
+													BorderThickness="{TemplateBinding BorderThickness}"
+													CornerRadius="8"
+													Padding="10,8">
+												<ContentPresenter HorizontalAlignment="Center"
+																  VerticalAlignment="Center"/>
+											</Border>
+											<ControlTemplate.Triggers>
+												<Trigger Property="IsMouseOver" Value="True">
+													<Setter Property="Background" Value="#2A2A2A"/>
+												</Trigger>
+												<Trigger Property="IsPressed" Value="True">
+													<Setter Property="Background" Value="#333333"/>
+												</Trigger>
+												<Trigger Property="IsEnabled" Value="False">
+													<Setter Property="Opacity" Value="0.55"/>
+												</Trigger>
+											</ControlTemplate.Triggers>
+										</ControlTemplate>
+									</Setter.Value>
+								</Setter>
+							</Style>
+						</Button.Style>
+					</Button>
+
+					<Button Content="Set Library Folder"
+							Height="44"
+							Background="#202020"
+							Foreground="#DDFFFFFF"
+							BorderBrush="#333333"
+							BorderThickness="1"
+							Click="SetLibraryLocation_Click">
+						<Button.Style>
+							<Style TargetType="Button">
+								<Setter Property="Cursor" Value="Hand"/>
+								<Setter Property="Template">
+									<Setter.Value>
+										<ControlTemplate TargetType="Button">
+											<Border Background="{TemplateBinding Background}"
+													BorderBrush="{TemplateBinding BorderBrush}"
+													BorderThickness="{TemplateBinding BorderThickness}"
+													CornerRadius="8"
+													Padding="10,8">
+												<ContentPresenter HorizontalAlignment="Center"
+																  VerticalAlignment="Center"/>
+											</Border>
+											<ControlTemplate.Triggers>
+												<Trigger Property="IsMouseOver" Value="True">
+													<Setter Property="Background" Value="#2A2A2A"/>
+												</Trigger>
+												<Trigger Property="IsPressed" Value="True">
+													<Setter Property="Background" Value="#333333"/>
+												</Trigger>
+												<Trigger Property="IsEnabled" Value="False">
+													<Setter Property="Opacity" Value="0.55"/>
+												</Trigger>
+											</ControlTemplate.Triggers>
+										</ControlTemplate>
+									</Setter.Value>
+								</Setter>
+							</Style>
+						</Button.Style>
+					</Button>
+				</StackPanel>
+
+                <TreeView x:Name="LibraryTree"
+                          ItemsSource="{Binding LibraryRoot}"
+                          Background="#111111"
+                          BorderThickness="0"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
+                    <TreeView.Resources>
+
+                        <!-- Folder nodes: big touch target + rotating chevron -->
+                        <HierarchicalDataTemplate DataType="{x:Type local:FolderNode}"
+                                                  ItemsSource="{Binding Children}">
+                            <Border MinHeight="44"
+                                    Padding="12,10"
+                                    Margin="8,2,8,2"
+                                    CornerRadius="8"
+                                    Background="#202020"
+                                    BorderBrush="#333333"
+                                    BorderThickness="1"
+                                    PreviewMouseLeftButtonDown="FolderHeader_Click">
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Chevron (rotates, stays light) -->
+                                    <TextBlock Text="▸"
+                                               FontSize="16"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"
+                                               RenderTransformOrigin="0.5,0.5">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#AAFFFFFF"/>
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Setter Property="RenderTransform">
+                                                    <Setter.Value>
+                                                        <RotateTransform Angle="0"/>
+                                                    </Setter.Value>
+                                                </Setter>
+
+                                                <Style.Triggers>
+                                                    <!-- Hide chevron ONLY for the root Library folder -->
+                                                    <DataTrigger Binding="{Binding Name}" Value="Library">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+
+                                                    <!-- Rotate when expanded -->
+                                                    <DataTrigger Binding="{Binding IsExpanded,
+                                                        RelativeSource={RelativeSource AncestorType=TreeViewItem}}"
+                                                                 Value="True">
+                                                        <Setter Property="RenderTransform">
+                                                            <Setter.Value>
+                                                                <RotateTransform Angle="90"/>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Setter Property="Foreground" Value="#AAFFFFFF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                    <!-- Folder name -->
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Name}"
+                                               Foreground="#DDFFFFFF"
+                                               FontSize="15"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+
+                                <!-- Hover feedback -->
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="#202020"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="#2A2A2A"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                            </Border>
+                        </HierarchicalDataTemplate>
+
+                        <!-- Image nodes (lazy thumbnails; placeholder until loaded) -->
+                        <DataTemplate DataType="{x:Type local:ImageNode}">
+                            <Border Margin="10,0,10,10"
+									Width="160"
+									HorizontalAlignment="Center"
+                                    CornerRadius="6"
+                                    Background="#1A1A1A"
+                                    BorderBrush="#444444"
+                                    BorderThickness="1"
+                                    SnapsToDevicePixels="True"
+                                    MouseLeftButtonUp="ImageNode_Click">
+
+                                <Grid Height="120" ClipToBounds="True">
+
+                                    <Image Source="{Binding Thumbnail}"
+                                           Stretch="UniformToFill"
+                                           HorizontalAlignment="Stretch"
+                                           VerticalAlignment="Stretch"/>
+
+                                    <!-- Placeholder when Thumbnail is null -->
+                                    <TextBlock Text="Expand folder to load"
+                                               Foreground="#77FFFFFF"
+                                               FontSize="11"
+                                               TextAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Thumbnail}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+                                </Grid>
+
+                                <Border.ToolTip>
+                                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" MaxWidth="420"/>
+                                </Border.ToolTip>
+                            </Border>
+                        </DataTemplate>
+
+                        <!-- TreeViewItem styling -->
+                        <Style TargetType="TreeViewItem">
+                            <Setter Property="Margin" Value="0,0,0,2"/>
+                            <Setter Property="IsExpanded" Value="False"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="#DDFFFFFF"/>
+                            <EventSetter Event="Expanded" Handler="LibraryTreeItem_Expanded"/>
+							<EventSetter Event="Collapsed" Handler="LibraryTreeItem_Collapsed"/>
+
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type TreeViewItem}">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <ContentPresenter Grid.Row="0"
+                                                              ContentSource="Header"
+                                                              RecognizesAccessKey="True"/>
+
+                                            <ItemsPresenter x:Name="ItemsHost"
+                                                            Grid.Row="1"
+                                                            Margin="18,0,0,0"/>
+                                        </Grid>
+
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsExpanded" Value="False">
+                                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
+                                            </Trigger>
+                                            <Trigger Property="HasItems" Value="False">
+                                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+
+                    </TreeView.Resources>
+                </TreeView>
+
+            </DockPanel>
+        </Border>
+
+        <!-- Adjustable boundary (splitter) -->
+        <GridSplitter Grid.Column="1"
+                      Width="10"
+                      HorizontalAlignment="Stretch"
+                      VerticalAlignment="Stretch"
+                      Background="#222222"
+                      ShowsPreview="False"
+                      ResizeBehavior="PreviousAndNext"
+                      ResizeDirection="Columns">
+            <GridSplitter.Style>
+                <Style TargetType="GridSplitter">
+                    <Setter Property="Background" Value="#222222"/>
+                    <Style.Triggers>
+                        <!-- Light gray while dragging -->
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter Property="Background" Value="#BBBBBB"/>
+                        </Trigger>
+                        <!-- Optional: a bit lighter on hover for discoverability -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="#444444"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </GridSplitter.Style>
+        </GridSplitter>
+
+        <!-- RIGHT: Cocktail display -->
+        <Grid Grid.Column="2" Background="Black">
+			<Viewbox x:Name="CocktailViewbox"
+					 Stretch="Uniform"
+					 StretchDirection="DownOnly"
+					 HorizontalAlignment="Center"
+					 VerticalAlignment="Center">
+
+                <Border Background="Black">
+					<ItemsControl x:Name="ImagesItems"
+								  ItemsSource="{Binding Images}"
+								  HorizontalAlignment="Center"
+								  VerticalAlignment="Center"
+								  AllowDrop="True"
+								  DragOver="ImagesItems_DragOver"
+								  Drop="ImagesItems_Drop">
+
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+								<!-- Right-click closes -->
+								<Border Background="Transparent"
+										AllowDrop="True"
+										PreviewMouseLeftButtonDown="ImageItem_PreviewMouseLeftButtonDown"
+										PreviewMouseMove="ImageItem_PreviewMouseMove"
+										DragOver="ImageItem_DragOver"
+										Drop="ImageItem_Drop"
+										MouseRightButtonUp="ImageItem_RightClickClose">
+									<Border.Style>
+										<Style TargetType="Border">
+											<Setter Property="Opacity" Value="1" />
+											<Style.Triggers>
+												<DataTrigger Binding="{Binding IsBeingDragged}" Value="True">
+													<Setter Property="Opacity" Value="0.45" />
+												</DataTrigger>
+											</Style.Triggers>
+										</Style>
+									</Border.Style>
+
+									<Grid>
+										<!-- Tap/click toggles filename display -->
+										<ToggleButton x:Name="TapToggle"
+													  Background="Transparent"
+													  BorderThickness="0"
+													  Focusable="False"
+													  PreviewMouseLeftButtonUp="ImageToggle_PreviewMouseLeftButtonUp">
+
+                                            <Grid Height="{Binding DataContext.DesignHeight, RelativeSource={RelativeSource AncestorType=Window}}">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
+
+                                                <Border Grid.Row="0" Background="Black">
+                                                    <Image Source="{Binding Bitmap}"
+                                                           Stretch="Uniform"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           RenderTransformOrigin="0.5,0.5">
+                                                        <Image.RenderTransform>
+                                                            <RotateTransform Angle="180"/>
+                                                        </Image.RenderTransform>
+                                                    </Image>
+                                                </Border>
+
+                                                <Border Grid.Row="1" Background="Black">
+                                                    <Image Source="{Binding Bitmap}"
+                                                           Stretch="Uniform"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                                </Border>
+                                            </Grid>
+                                        </ToggleButton>
+
+                                        <!-- Top filename overlay (rotated 180 so it mirrors the bottom one) -->
+										<Border VerticalAlignment="Top"
+											Background="#AA000000"
+											Padding="8,4"
+											Margin="6"
+											CornerRadius="6"
+											IsHitTestVisible="False"
+											Visibility="{Binding IsChecked, ElementName=TapToggle, Converter={StaticResource BoolToVis}}">
+										<TextBlock Foreground="#DDFFFFFF"
+											FontSize="12"
+											TextTrimming="CharacterEllipsis"
+											MaxWidth="520"
+											Text="{Binding Path, Converter={StaticResource FileNameNoExt}}"
+											RenderTransformOrigin="0.5,0.5">
+											<TextBlock.RenderTransform>
+												<RotateTransform Angle="180"/>
+											</TextBlock.RenderTransform>
+										</TextBlock>
+										</Border>
+
+<!-- Bottom filename overlay (normal orientation) -->
+<Border VerticalAlignment="Bottom"
+        Background="#AA000000"
+        Padding="8,4"
+        Margin="6"
+        CornerRadius="6"
+        IsHitTestVisible="False"
+        Visibility="{Binding IsChecked, ElementName=TapToggle, Converter={StaticResource BoolToVis}}">
+    <TextBlock Foreground="#DDFFFFFF"
+               FontSize="12"
+               TextTrimming="CharacterEllipsis"
+               MaxWidth="520"
+               Text="{Binding Path, Converter={StaticResource FileNameNoExt}}"/>
+</Border>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="Margin" Value="2,0,0,0"/>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+
+                    </ItemsControl>
+                </Border>
+            </Viewbox>
+
+			<!-- Overlay minimize button: does NOT affect image sizing -->
+			<!-- Overlay control stack: does NOT affect image sizing -->
+			<StackPanel HorizontalAlignment="Left"
+						VerticalAlignment="Top"
+						Margin="10"
+						Panel.ZIndex="10">
+
+				<StackPanel.Resources>
+					<Style x:Key="OverlayIconButtonStyle" TargetType="Button">
+						<Setter Property="Width" Value="40"/>
+						<Setter Property="Height" Value="40"/>
+						<Setter Property="FontSize" Value="18"/>
+						<Setter Property="FontWeight" Value="SemiBold"/>
+						<Setter Property="Background" Value="#202020"/>
+						<Setter Property="Foreground" Value="#DDFFFFFF"/>
+						<Setter Property="BorderBrush" Value="#333333"/>
+						<Setter Property="BorderThickness" Value="1"/>
+						<Setter Property="Cursor" Value="Hand"/>
+						<Setter Property="Margin" Value="0"/>
+						<Setter Property="Template">
+							<Setter.Value>
+								<ControlTemplate TargetType="Button">
+									<Border Background="{TemplateBinding Background}"
+											BorderBrush="{TemplateBinding BorderBrush}"
+											BorderThickness="{TemplateBinding BorderThickness}"
+											CornerRadius="8">
+										<ContentPresenter HorizontalAlignment="Center"
+														  VerticalAlignment="Center"/>
+									</Border>
+									<ControlTemplate.Triggers>
+										<Trigger Property="IsMouseOver" Value="True">
+											<Setter Property="Background" Value="#2A2A2A"/>
+										</Trigger>
+										<Trigger Property="IsPressed" Value="True">
+											<Setter Property="Background" Value="#333333"/>
+										</Trigger>
+										<Trigger Property="IsEnabled" Value="False">
+											<Setter Property="Opacity" Value="0.55"/>
+										</Trigger>
+									</ControlTemplate.Triggers>
+								</ControlTemplate>
+							</Setter.Value>
+						</Setter>
+					</Style>
+				</StackPanel.Resources>
+
+				<Button x:Name="MinimizeWindowButton"
+						Style="{StaticResource OverlayIconButtonStyle}"
+						Content="—"
+						FontSize="20"
+						Click="MinimizeWindow_Click"/>
+
+				<Border Height="10" Background="Transparent"/>
+
+				<Button x:Name="AlignLeftButton"
+						Style="{StaticResource OverlayIconButtonStyle}"
+						Content="⫷"
+						ToolTip="Align Left"
+						Click="AlignImagesLeft_Click"/>
+
+				<Button x:Name="AlignCenterButton"
+						Style="{StaticResource OverlayIconButtonStyle}"
+						Content="≡"
+						ToolTip="Align Center"
+						Margin="0,6,0,0"
+						Click="AlignImagesCenter_Click"/>
+			</StackPanel>
+
+            <TextBlock x:Name="HintText"
+                       Foreground="#AAFFFFFF"
+                       FontSize="16"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       TextAlignment="Center"
+                       Margin="24"
+                       IsHitTestVisible="False">
+				Drop images here to create a new library.
+				<LineBreak/>
+				-or-
+				<LineBreak/>
+				Place them in the Library folder (click Browse Library in the lower left corner).
+				<LineBreak/>
+				-or-
+				<LineBreak/>
+				Click Select Library Folder in the lower left to choose an existing folder.
+				<LineBreak/>
+				<LineBreak/>
+				<LineBreak/>
+				<LineBreak/>
+				Navigate your picture library using the list in the upper left corner.
+				<LineBreak/>
+				<LineBreak/>
+				Place images in sub-folders within the Library folder to reduce loading time.
+				<LineBreak/>
+				<LineBreak/>
+				Click an image to see its name.
+				<LineBreak/>
+				<LineBreak/>
+				Right click an image to close it.
+				
+			</TextBlock>
+        </Grid>
+    </Grid>
+</Window>
